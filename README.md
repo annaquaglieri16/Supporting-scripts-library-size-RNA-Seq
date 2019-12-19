@@ -20,16 +20,6 @@ sensitivity with this cohort.
 The example variant callset obtained with the Leucegene samples only
 contains published somatic variants (Lavallée, 2016).
 
-# Setup
-
-To run the workflow in the next sections, clone the repository
-below:
-
-``` bash
-git clone git@github.com:annaquaglieri16/Supporting-scripts-library-size-RNA-Seq.git
-cd ./Supporting-scripts-library-size-RNA-Seq
-```
-
 ## Software used
 
   - `R/3.5.2`

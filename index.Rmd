@@ -28,7 +28,7 @@ This documentation contains the code to partially reproduce the results in the m
 
 The example variant callset obtained with the Leucegene samples only contains published somatic variants[@Lavallee2016-sf].   
 
-# Setup
+## Setup
 
 To run the workflow in the next sections, clone the repository below:
 
