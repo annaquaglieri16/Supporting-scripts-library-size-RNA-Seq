@@ -21,7 +21,7 @@ tot_reads <- info_tcga %>%
   separate(Sample, into = c("Name"),sep="[.]") %>%   # 80000000 = target number of reads, double the fragments 
   dplyr::select(Name,Prop40,total_reads) 
 
-write_csv(tot_reads,"data/downsampling-proportion-TCGA-LAML.csv")
+write_csv(tot_reads,"data/AdditionalTables/TableS4-downsampling-proportion-TCGA-LAML.csv")
 ```
 
 

@@ -1,0 +1,3 @@
+# TCGA variant truth sets {#ch:tcga-truth}
+
+Table `./data/AdditionalTables/TableS5-TCGA-LAML-truth-set.csv` includes the SNVs in Set1 used as truth set for the sensitivity analysis using the TCGA-LAML cohort. Set2 can be obtained by subsetting the table considering only genes in Table S3 of the Additional Files. 

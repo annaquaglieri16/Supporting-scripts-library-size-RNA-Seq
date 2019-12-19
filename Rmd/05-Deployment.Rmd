@@ -1,0 +1,3 @@
+# Gitbook publication and deployment {#ch:deploy}
+
+The `gitbook` was published with `bookdown`[@bookdown] and deployed using [Netlify](https://app.netlify.com/).
