@@ -1,0 +1,7 @@
+book_filename: "Supporting-libsize-scripts-book"
+language:
+  ui:
+  chapter_name: "Chapter "
+rmd_subdir: true
+output_dir: Supporting-libsize-scripts-book
+delete_merged_file: true

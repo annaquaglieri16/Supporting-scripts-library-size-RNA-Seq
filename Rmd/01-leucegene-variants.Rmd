@@ -1,0 +1,145 @@
+# Download, quality control and downsample the Leucegene RNA-Seq samples {#ch:leucegene-down}
+
+## Download RNA-Seq data from GEO
+
+The initial unaligned RNA-Seq CBF-AML samples are downloaded from [GEO](https://www.ncbi.nlm.nih.gov/geo/) using the accession numbers GSE49642, GSE52656, GSE62190, GSE66917, and GSE67039. Only 46 FASTQ files of samples whose mutations are reported in Supplemental Table 3 of [@Lavallee2016-sf] are kept for the analysis. Sample SRX381851 is removed due to low number of available reads. The file `data/CBF_AML_samples.csv` contains the sample names of the 46 samples used in the study.
+
+Below is an example using accession number GSE52656 where one of the CBF-AML samples is present, namely 07H099.
+
+### Get SRX sample names 
+
+The `GEOquery` package can be used to extract `SRX` files linked to an accession number. 
+
+```{r message=FALSE,warning=FALSE,warning=FALSE}
+# CRAN packages
+library(tidyverse)
+library(knitr)
+library(here)
+
+# Bioconductor packages
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("GEOquery",update = FALSE)
+library(GEOquery)
+```
+
+Below the accession number **GSE52656** is used as example. 
+
+```{r eval=TRUE}
+# Get matrix files for every accession number
+series_matrix_info <- function(gse){
+gsed <- getGEO(gse,GSEMatrix=TRUE)
+gse.mat <- pData(phenoData(gsed[[1]]))
+reduced <- gse.mat[,c("title","geo_accession","relation.1")]
+write.csv(reduced,file.path(here(),"data",paste(gse,"_",nrow(gse.mat),".csv",sep="")),row.names = FALSE)
+}
+
+series_matrix_info("GSE62190") 
+```
+
+
+Every row in Table \@ref(tab:SRX) contains sample names (`title`) and `GSM` numbers. In order to download a particular sample we need the `SRA` terms which are the names starting with: `SRX***` in the `relation.1` column. 
+
+```{r SRX,message=FALSE}
+matrix_file <- list.files(path = file.path(here(),"data"),pattern = "GSE",full.names = TRUE)
+GSEmatrix <- read_csv(matrix_file)
+
+kable(GSEmatrix[1:5,],caption="SRX sample names linked to the accession number GSE62190")
+```
+
+With some string processing we can extract the `SRX` entries. 
+
+```{r message=FALSE}
+GSEmatrix$SRX <- stringr::str_extract(string = GSEmatrix$relation.1,pattern = "SRX[0-9][0-9][0-9][0-9][0-9][0-9]")
+GSEmatrix$relation.1 <- NULL
+kable(head(GSEmatrix))
+```
+
+The next chunk extracts only samples whose variants were published in [@Lavallee2016-sf].
+
+```{r message=FALSE}
+# CBF-AML Sample
+CBF_AML_info <- read.csv(file.path(here(),"data/CBF_AML_samples.csv"))
+cbf.samples <- GSEmatrix[GSEmatrix$title %in% CBF_AML_info$title, ]
+```
+
+### Create NCBI query
+
+```{r}
+search_ncbi <- paste(cbf.samples$SRX,collapse=" OR ")
+search_ncbi
+```
+
+
+
+The search `r search_ncbi` can be pasted into NCBI https://www.ncbi.nlm.nih.gov/sra and by following the intructions in https://www.ncbi.nlm.nih.gov/sra/docs/sradownload/#download-sequence-data-files-usi **Download sequence data files using SRA Toolkit** one can download all the `SRR` run names and information of the runs. 
+
+Sample `SRX729580` is used as example here and it was run across different lanes whose samples are listed in `./data/SraAccList.txt`. 
+
+Six `.sra` sampels are downloaded with `prefetch` with the code below that can be run a Unix terminal from the repository directory.
+
+
+```{bash eval=FALSE}
+module load sra-toolkit/2.8.1
+# Run in a unix terminal in the repository directory
+# The sra files are downloaded in your home directory under ~/ncbi/public/sra
+prefetch --option-file ./data/SraAccList.txt
+```
+
+The SRA files are then converted to `FASTQ` files with `fastq-dump --split-files` using `fastqc/0.11.8`. 
+
+The `sra` files are downloaded by default into your home directory under `~/ncbi/public/sra`. In the example below I converted the `sra` to fastq with `fastq-dump`, performed quality control with `fastqc` and the FASTQ files to `./data/test-fastq`.
+
+```{bash eval=FALSE}
+module load fastqc/0.11.8
+module load python/3.6.0 # for MultiQC
+module load parallel
+
+# Run in a unix terminal
+# Convert to Fastq
+fastq-dump --split-files path_to_sra_files/*
+
+# Move fastq files in repository directory
+mkdir ./data/fastq-files
+mv path_to_sra_files/*fastq ./data/fastq-files
+
+# Multiqc to check quality of files
+find ./data/fastq-files -name "SRR*.fastq" > ./data/fastq_files.txt
+cat ./data/fastq_files.txt | parallel -j 10 "fastqc {}"
+
+# Combine fastqc output and check quality in the html file
+multiqc ./data/fastq-files/ --interactive -n "files-downloaded" -o ./data/fastq-files/
+
+# Move fastqc output into a different directory
+mkdir ./data/fastqc/
+mv ./data/fastq-files/*html  ./data/fastqc/
+mv ./data/fastq-files/*zip  ./data/fastqc/
+```
+
+## Downsampling FASTQ files to a fixed number of reads {#ch:leucegene-downsample}
+
+Each sample was sequenced over multiple lanes and the FASTQ files for one sample were first concatenated and then downsampled. In the example below only the the FASTQ files whose samples are defined in the second argument (`./data/sample-to-merge.txt`) are combined. The function needs to be run in the directory where the files are saved.
+
+```{bash eval=FALSE}
+cd ./data/fastq-files
+python ../../functions/combined_fastqs.py ../match-SRX-SRR.txt ../sample-to-merge.txt
+
+fastqc SRX729580_combined_1.fastq
+fastqc SRX729580_combined_2.fastq
+
+multiqc . --interactive -n "files-downloaded-merged" -o .
+```
+
+
+The [seqtk](https://github.com/lh3/seqtk) tool was then used to downsample an exact number of reads from paired end (PE) FASTQ files. In the code below we downsample the fastq file to 30M fragments and perform QC to check the final number of reads in each file. 
+
+```{bash eval=FALSE}
+path-to-seqtk-folder/seqtk sample -s100 SRX729580_combined_1.fastq 30000000 > sub30M_SRX729580_combined_1.fastq
+path-to-seqtk-folder/seqtk sample -s100 SRX729580_combined_2.fastq 30000000 > sub30M_SRX729580_combined_2.fastq
+
+# Check that the downsampled samples have the correct size and that the downsampling didn't corrupt the files
+fastqc sub30M_SRX729580_combined_1.fastq
+fastqc sub30M_SRX729580_combined_2.fastq
+multiqc . --interactive -n "files-downsampled" -o .
+```
+

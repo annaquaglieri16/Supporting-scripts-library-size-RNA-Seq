@@ -1,0 +1,38 @@
+# TCGA-LAML downsampling {#ch:tcga-down}
+
+1.24 is taken as the ratio between the mean proportion of mapped reads in the Leucegene and the TCGA-LAML cohorts. This is discussed in the Methods paper.
+
+`TCGA-LAML-multiqc_samtools_flagstat.txt` was created using the `samtools flagstat` function.
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+
+tcga <- read.delim("data/TCGA-LAML-multiqc_samtools_flagstat.txt")
+info_tcga <- subset(tcga,select=c("Sample","mapped_passed","total_passed","total_failed","secondary_passed","secondary_failed")) %>%
+  mutate(total_reads = (total_failed - secondary_failed) + (total_passed - secondary_passed),
+         prop_mapped_passed = (mapped_passed - secondary_passed)/total_reads)
+
+info_tcga$total_passed_no_secondary <- info_tcga$mapped_passed - info_tcga$secondary_passed
+summary(info_tcga$total_passed_no_secondary/2/1000000) # divide by two as flagstats reports the number of reads not fragments
+
+tot_reads <- info_tcga %>%
+  dplyr::select(Sample,total_reads) %>% # total_reads is the sum of both Reads1 and Reads2
+  mutate(Prop40 = round((80000000/total_reads)*1.24,2)) %>%
+  separate(Sample, into = c("Name"),sep="[.]") %>%   # 80000000 = target number of reads, double the fragments 
+  dplyr::select(Name,Prop40,total_reads) 
+
+write_csv(tot_reads,"data/downsampling-proportion-TCGA-LAML.csv")
+```
+
+
+* Script to downsample at a certain proportion
+
+```{bash eval=FALSE}
+module load picard-tools/2.9.4
+module load samtools/1.6
+
+DownsampleSam I=input.bam O=downsampled_output.bam PROBABILITY=sample_specific_prop RANDOM_SEED=200
+
+# Used to check the size of the doensampled file
+samtools flagstat downsampled_output.bam
+```

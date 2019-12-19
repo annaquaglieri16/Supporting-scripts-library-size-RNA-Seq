@@ -1,0 +1,65 @@
+---
+title: "Supporting scripts: Finding a suitable library size to call variants in RNA-Seq"
+author: "Anna Quaglieri"
+site: bookdown::bookdown_site
+linkcolor: magenta
+urlcolor: magenta
+link-citations: yes
+bibliography: biblio.bib
+---
+
+```{r setup, include=FALSE,echo=FALSE}
+options("knitr.graphics.auto_pdf" = TRUE)
+library(knitr)
+library(tidyverse)
+library(png)
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.path = 'figures/', 
+                      fig.align = 'center', fig.show = 'hold',
+                      out.width = ifelse(knitr::is_html_output(), "100%", "\\textwidth"),
+  cache.path = ifelse(knitr::is_html_output(), 'cache-gitbook/', 'cache-pdfbook/'))
+```
+
+# Setup
+
+To run the workflow in the next sections, clone the repository below:
+
+```{bash engine=bash,eval=FALSE}
+git clone git@github.com:annaquaglieri16/Supporting-scripts-library-size-RNA-Seq.git
+
+cd ./Supporting-scripts-library-size-RNA-Seq
+```
+
+
+The functions used for variant calling and downsampling are inside the `./functions` folder. 
+
+* Chapter \@ref(ch:leucegene-down) comments the steps to download and run QC on example files from the Leucegene cohort. The script `./functions/download-and-qc.sh` contains only the scripts to run.
+* To follow the steps and settings used to align, call and create a standardised output of the variants, see Chapter \@ref(ch:acs). Once the examples files are downloaded and pre-processed it is possible to run the whole workflow by running the script `./functions/align-call-stand.sh`, after appropriately setting input files and directory and downloading the required programs.
+* Chapter \@ref(ch:tcga-down) contains information about the proportions used to downsample the TCGA-LAML samples.
+
+
+## Software used
+
+* `R/3.5.2`
+
+Loaded on Unix
+
+* `sra-toolkit/2.8.1`
+* `fastqc/0.11.8`
+* `python/3.6.0` (for [MultiQC](https://multiqc.info/))
+* `parallel`
+* `STAR/2.5`
+* `sambamba/0.6.6`
+* `picard-tools/2.20.2`
+* `vardict/1.5.1` (loads `R3.5.2`)
+* `gatk/3.7.0`
+* `varscan/2.3.9`
+* `vcftools/0.1.13`
+* `samtools/1.6`
+* `ensembl-vep/89.0`
+* `vcflib/1.0.0-rc1`
+
+
+

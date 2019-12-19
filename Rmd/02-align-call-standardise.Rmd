@@ -1,0 +1,405 @@
+# Align, call and standardise {#ch:acs}
+
+
+## Alignement, Read Groups, Mark duplicates {#ch:align}
+
+The *FASTQ* are aligned with *STAR*. The index needed for STAR is created using the functions below after downloading the UCSC hg19 fasta reference genome and GTF file from [iGenomes](https://sapac.support.illumina.com/sequencing/sequencing_software/igenome.html). For the index, STAR requires an extra parameter called `sjdbOverhang` which is usually set to be *(read length - 1)* epends on the read length used for sequencing, in this case 100bp - 1. 
+
+### STAR index
+
+```{bash eval=FALSE}
+module load STAR/2.5
+module load R/3.5.2
+
+# Iniaitlise Genome directory where to save STAR Index and STAR Fusion Index folders
+# 99 = read length - 1 as suggested in STAR manual 
+star_genome100=path_to_genome_directory/star_index_hg19_99
+genome=reference_genome_hg19.fasta
+gtf=gtf_hg19.gtf
+
+mkdir -p ${star_genome100}
+
+STAR \
+--runMode genomeGenerate \
+--genomeDir ${star_genome100} \
+--genomeFastaFiles ${genome} \
+--sjdbOverhang 99 \
+--sjdbGTFfile ${gtf}
+
+```
+
+From this point onwards the script `./functions/align-call-stand.sh` can be setup with the correct file paths and run.
+
+### STAR-1pass
+
+The 45 FASTQ files were aligned using STAR in two pass mode. First all samples are aligned in the first pass using the example function below, a wrapper function that calls STAR. The example is provided for one sample. 
+
+```{bash eval=FALSE}
+module load STAR/2.5
+module load R/3.5.2
+
+cd path_to_repository/
+
+star_genome100=path_to_genome_directory/star_index_hg19_99
+# compress fastq file
+pigz ./data/fastq-files/sub*combined*.fastq
+FQ1=./data/fastq-files/sub30M_SRX729580_combined_1.fastq.gz
+FQ2=./data/fastq-files/sub30M_SRX729580_combined_2.fastq.gz
+bamout=SRX729580
+mkdir ./data/fastq-files/star-pass1
+
+Rscript ./functions/run_STAR.R \
+--genome_index ${star_genome100} \
+--fastqfiles $FQ1,$FQ2 \
+--sampleName SRX729580 \
+--RlibPath "path_to_R/3.4" \
+--outdir ./data/fastq-files/star-pass1 --STARmode "1Pass"
+
+# Check alignment stats
+multiqc ./data/fastq-files/star-pass1 --interactive -n "star1pass" -o ./data/fastq-files/star-pass1
+```
+
+The `R` function above is a wrapper for the `STAR` call with settings below:
+
+```{bash eval=FALSE}
+# Version STAR/2.5
+STAR --genomeDir $star_genome100 \
+--readFilesIn $FQ1 $FQ2 \
+--runThreadN 27 \
+--chimSegmentMin 10 \
+--readFilesCommand zcat \
+--alignSJoverhangMin 8 \
+--outBAMcompression 10 \
+--alignSJDBoverhangMin 1 \
+--limitBAMsortRAM 85741557872 \
+--outFilterMismatchNmax 999 \
+--alignIntronMin 20 \
+--alignIntronMax 200000 \
+--alignMatesGapMax 20000 \
+--outFileNamePrefix ./data/fastq-files/star-pass1/SRX729580 \
+--outSAMtype BAM SortedByCoordinate \
+--outFilterType BySJout \
+--outFilterMultimapNmax 15
+```
+
+After running STAR on all the fastq files available the splice junctions are collected from the first pass and use them for the second pass.
+
+```{bash eval=FALSE}
+# concatenate splice junctions from all samples from ran in pass1
+cat ./data/fastq-files/star-pass1/*SJ.out.tab > ./data/fastq-files/star-pass1/combined_sj.out.tab
+# Dobin suggests to remove chrm cause they are usually False positives
+awk '!/chrM/' ./data/fastq-files/tar-pass1/combined_sj.out.tab > ./data/fastq-files/star-pass1/combined_sj_nochrM.out.tab
+```
+
+### STAR-2pass
+
+The STAR call aligns and sorts reads by coordinate.
+
+```{bash eval=FALSE}
+module load STAR/2.5
+module load R/3.5.2
+
+star_genome100=path_to_genome_directory/star_index_hg19_99
+FQ1=./data/fastq-files/sub30M_SRX729580_combined_1.fastq.gz
+FQ2=./data/fastq-files/sub30M_SRX729580_combined_2.fastq.gz
+mkdir ./data/fastq-files/star-pass2
+
+Rscript ./functions/run_STAR.R \
+--genome_index $star_genome100 \
+--fastqfiles $FQ1,$FQ2 \
+--sampleName SRX729580 \
+--RlibPath "path_to_R/3.4" \
+--outdir ./data/fastq-files/star-pass2 --STARmode "2PassMulti" \
+--sjfile ./data/fastq-files/star-pass1/combined_sj_nochrM.out.tab
+
+# Check alignment stats
+multiqc ./data/fastq-files/star-pass1 --interactive -n "star2pass" -o ./data/fastq-files/star-pass2
+```
+
+The function above is a wrapper for the STAR call used in the first pass with the additinal settings below: 
+
+```{bash eval=FALSE}
+--outFilterScoreMinOverLread 0.3 \
+--chimSegmentReadGapMax 6 \
+--alignSJstitchMismatchNmax 5 -1 5 5 \
+--chimOutType WithinBAM \
+--chimJunctionOverhangMin 2 \
+--limitSjdbInsertNsj 2273673 \
+--sjdbFileChrStartEnd data/test-fastq/star-pass1/combined_sj_nochrM.out.tab
+```
+
+### Processing post alignment {#sec:post-align}
+
+These include:
+
+1. Mark PCR duplicates, [sambamba markdup](http://lomereiter.github.io/sambamba/docs/sambamba-markdup.html) from `sambamba/0.6.6` was used.
+
+2. Add Read Groups using [AddOrReplaceReadGroups](https://broadinstitute.github.io/picard/command-line-overview.html) (from `picard-tools/2.9.4`). Read groups are required by `GATK`.
+
+If a sample was sequenced across different lanes lane-specific read groups are required for each separate bamfile (e.g. SampleName_L1, SampleName_L2). This sample name will be used for the fields `RGLB` and `RGSM` in the `AddOrReplaceReadGroups` example below. 
+
+```{bash eval=FALSE}
+module load picard-tools/2.9.4
+# Picard tool function to add read groups to a bamfile
+AddOrReplaceReadGroups \
+I=./data/fastq-files/star-pass2/SRX729580Aligned.sortedByCoord.out.bam \
+O=./data/fastq-files/star-pass2/SRX729580Aligned.sortedByCoord.out.RG.bam \
+RGID=SRX729580 \
+RGPU=SRX729580 \
+RGLB=SRX729580_L1 \
+RGPL="illumina" \
+RGSM=SRX729580_L1
+```
+
+3. [ValidateSamFile](https://broadinstitute.github.io/picard/command-line-overview.html) (from picard-tools/2.9.4) can be used to check for errors in the final bamfile.
+
+5. `sambamba index` to index the final bamfile.
+
+```{bash eval=FALSE}
+module load sambamba/0.6.6
+
+sambamba index data/test-fastq/star-pass2/SRX729580Aligned.sortedByCoord.out.RG.bam
+```
+
+## GATK pre-processing to call variants with MuTect and VarScan
+
+The function `./functions/gatk_process_pipe.R` performs the following steps required by GATK3 to run MuTect2:
+
+* *SplitNCigarReads* see [GATK documentation](https://software.broadinstitute.org/gatk/documentation/tooldocs/3.8-0/org_broadinstitute_gatk_tools_walkers_rnaseq_SplitNCigarReads.php)
+* *Base recalibration* see [GATK documentation](https://gatkforums.broadinstitute.org/gatk/discussion/44/base-quality-score-recalibration-bqsr). 
+
+These steps are suggested in the [`GATK best practices for RNA-Seq variant calling`](https://software.broadinstitute.org/gatk/documentation/article.php?id=3891). 
+
+Below is an example call which wraps the steps above and check if output files have already been created.
+
+```{bash eval=FALSE}
+module load gatk/3.7.0
+module load sambamba/0.6.6
+module load R/3.5.2
+
+genome_fasta=reference_genome_hg19.fasta
+
+Rscript ./functions/gatk_process_pipe.R \
+--reference_fasta $genome_fasta \
+--bamfile data/test-fastq/star-pass2/SRX729580Aligned.sortedByCoord.out.RG.bam \
+--sampleName SRX729580 \
+--knownSites1 path_to_GATK_Bundle_files/dbsnp_138.hg19.excluding_sites_after_129.vcf \
+--knownSites2 path_to_GATK_Bundle_files/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf \
+--knownSites3 path_to_GATK_Bundle_files/1000G_phase1.indels.hg19.sites.vcf 
+```
+
+The function above is a wrapper for the following `GATK3` calls.
+
+### SplitNCigarReads
+
+```{bash eval=FALSE}
+gatk -T SplitNCigarReads -R path_to_genome.fa \
+-I data/test-fastq/star-pass2/SRX729580Aligned.sortedByCoord.out.RG.bam \
+-o data/test-fastq/star-pass2/SRX729580Aligned.reorderedDupl.rg.split.bam \
+--filter_mismatching_base_and_quals -U ALLOW_N_CIGAR_READS -rf ReassignOneMappingQuality -RMQF 255 -RMQT 60 \
+--log_to_file data/test-fastq/star-pass2/SRX729580_RG_DUPL_SPLIT_log
+```
+
+### Base recalibration
+
+Base recalibration using known sites downloaded from the [GATK Bundle](https://github.com/snewhouse/ngs_nextflow/wiki/GATK-Bundle). More information about base recalibration can be found on [GATK website](https://software.broadinstitute.org/gatk/documentation/tooldocs/3.8-0/org_broadinstitute_gatk_tools_walkers_bqsr_BaseRecalibrator.php). 
+
+```{bash eval=FALSE}
+module load gatk/3.7.0
+
+gatk -T BaseRecalibrator -R path_to_genome.fa \
+-I data/test-fastq/star-pass2/SRX729580Aligned.reorderedDupl.rg.split.bam -nct 8 \
+-knownSites path_to_GATK_Bundle_files/dbsnp_138.hg19.excluding_sites_after_129.vcf \
+-knownSites path_to_GATK_Bundle_files/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf \
+-knownSites path_to_GATK_Bundle_files/1000G_phase1.indels.hg19.sites.vcf \
+-o data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_recal_data.table \
+--log_to_file data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_recal_step1_log 
+
+gatk -T BaseRecalibrator -R path_hg19_reference/genome.fa \
+-I data/test-fastq/star-pass2/SRX729580Aligned.reorderedDupl.rg.split.bam -nct 8 \
+-knownSites path_to_GATK_Bundle_files/dbsnp_138.hg19.excluding_sites_after_129.vcf \
+-knownSites path_to_GATK_Bundle_files/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf \
+-knownSites path_to_GATK_Bundle_files/1000G_phase1.indels.hg19.sites.vcf \
+-BQSR data/test-fastq/star-pass2/BaseQRecal/SRX729580/SampleName_recal_data.table \
+-o data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_post_recal_data.table \
+--log_to_file data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_recal_step2_log 
+
+gatk -T AnalyzeCovariates -R path_hg19_reference/genome.fa \
+-before data/test-fastq/star-pass2/BaseQRecal/SRX729580/SSRX729580_recal_data.table \
+-after data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_post_recal_data.table \
+-csv data/test-fastq/star-pass2/BaseQRecal/SRX729580/SSRX729580_recalibration_plots.csv \
+-plots data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_recalibration_plots.pdf \
+--log_to_file data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_recal_analyseCov_log 
+
+gatk -T PrintReads -R path_hg19_reference/genome.fa \
+-I data/test-fastq/star-pass2/SRX729580Aligned.reorderedDupl.rg.split.bam \
+-o data/test-fastq/star-pass2/SRX729580Recal.reorderedDupl.rg.split.bam \
+-nct 8 -BQSR data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_post_recal_data.table \
+--log_to_file data/test-fastq/star-pass2/BaseQRecal/SRX729580/SRX729580_Log_recalibrated_bases
+```
+
+MultiQC was used to create summary after running pre-processing with GATK https://multiqc.info/docs/#gatk.
+
+## Variant calling {#ch:call-variants}
+
+Variants are called on regions of interest corresponding to the gene bodies of the genes whose variants are reported in **Supplemental Table 3** of [@Lavallee2016-sf]. The `bed` file with genomic regions is `./data/target_regions.bed`.
+
+Variants are called with `MuTect2`, `VarScan` and `VarDict` in tumour-only mode and annotated using the [Variant Effect Preditor (VEP)](https://asia.ensembl.org/info/docs/tools/vep/index.html). The directory needed for variant calling with VarDict (`path_to_vardict/VarDict`) was downloaded from VarDict GitHub page https://github.com/AstraZeneca-NGS/VarDict. 
+
+The `./functions/call_variants.R` function is a wrapper to call and annotate variants with the callers listed above.
+
+
+```{bash eval=FALSE}
+module load R/3.5.2 # needed for vardict
+module load vardict/1.5.1
+module load vcftools/0.1.13 # needed for variant parsing
+module load ensembl-vep/89.0
+
+# Vardict tumour-only call
+Rscript ./functions/call_variants.R \
+--reference_fasta path_hg19_reference/genome.fa \
+--bamfile data/test-fastq/star-pass2/SRX729580Aligned.sortedByCoord.out.RG.split.bam \
+--sampleName SRX729580 \
+--regions ./data/target_regions.bed \
+--genome_assembly 'GRCh37' \
+--VarDict_dir path_to_vardict_directory \
+--caller vardict \
+--outputdir_suffix "caller_defaults" \
+--VEPcall 'vep --dir_cache path_to_vep_cache/.vep --offline' \
+--output_directory ./results/
+ 
+# VarScan tumour-only call 
+module load R/3.5.2
+module load varscan/2.3.9
+module load vcftools/0.1.13 # needed for variant parsing
+module load ensembl-vep/89.0
+
+Rscript ./functions/call_variants.R \
+--reference_fasta path_to_genome.fa \
+--bamfile data/test-fastq/star-pass2/SRX729580Recal.reorderedDupl.rg.split.bam \
+--sampleName SRX729580 \
+--regions ./data/target_regions.bed \
+--genome_assembly 'GRCh37' \
+--caller varscan \
+--outputdir_suffix "caller_defaults" \
+--VEPcall 'vep --dir_cache path_to_vep_cache/.vep --offline' \
+--output_directory ./results/
+
+
+# MuTect tumour-only call 
+module load R/3.5.2
+module load gatk/3.7.0 
+module load vcftools/0.1.13
+module load ensembl-vep/89.0
+
+Rscript ./functions/call_variants.R \
+--reference_fasta path_to_genome.fa \
+--bamfile data/test-fastq/star-pass2/SRX729580Recal.reorderedDupl.rg.split.bam \
+--sampleName SRX729580 \
+--regions ./data/target_regions.bed \
+--genome_assembly 'GRCh37' \
+--caller mutect \
+--outputdir_suffix "caller_defaults" \
+--VEPcall 'vep --dir_cache path_to_vep_cache/.vep --offline' \
+--output_directory ./results/
+```
+
+The calls using the function above are wrappers for the calls done by each caller using the settings below.
+
+### MuTect2 settings
+
+```{bash eval=FALSE}
+gatk -T MuTect2 -R path_to_genome.fa \
+-I:tumor data/test-fastq/star-pass2/SRX729580Recal.reorderedDupl.rg.split.bam \
+-L ./data/target_regions.bed \
+-o ./results/mutect/regions_caller_defaults/SRX729580_germline_snvs_indels.vcf \
+-log ./results/mutect/regions_caller_defaults/SRX729580_germline_snvs_indels_log
+```
+
+### Samtools + VarScan2 settings
+
+```{bash eval=FALSE}
+samtools mpileup --output-tags AD,ADF,ADR,DP,SP \
+--fasta-ref path_to_genome.fa \
+-l ./data/target_regions.bed data/test-fastq/star-pass2/SSRX729580Aligned.sortedByCoord.out.RG.split.recalibrated.bam | varscan mpileup2cns --variants 1 --output-vcf 1 --min-var-freq 0.01 > ./results/varscan/regions_caller_defaults/SSRX729580_germline_snvs_indels.vcf 2> ./results/varscan/regions_caller_defaults/SSRX729580_germline_snvs_indels_log
+```
+
+### VarDict settings
+
+```{bash eval=FALSE}
+vardict -f 0.05 -c 1 -S 2 -E 3 -g 4 -r 2 -t -th 10 -v -G  path_to_genome.fa \
+-b data/test-fastq/star-pass2/SRX729580Aligned.sortedByCoord.out.RG.split.bam ./data/target_regions.bed  | vardict_dir/teststrandbias.R | vardict_dir/var2vcf_valid.pl -N -E -f 0.05 >  ./results/vardict/regions_default-settings/SSRX729580_germline_snvs_indels.vcf
+```
+
+### VEP settings
+
+```{bash eval=FALSE}
+module load ensembl-vep/89.0
+
+vep --dir_cache dir_to_VEP_cache/.vep --offline \
+-i ./results/vardict/regions_default-settings/SSRX729580_germline_snvs_indels.vcf \
+-o ./results/vardict/regions_default-settings/annotated_variants/SSRX729580_germline_annotated.vcf \
+--cache --everything --force_overwrite --assembly GRCh37 --fork 12 --vcf --port 3337
+```
+
+
+## Standardise variants output
+
+The function `Rscript ./functions/call_variants.R` will return as output variants in a standardised format so that they can be easily compared across callers. This means that fields of interest, like variant allele frequency and depth at a variant site, which are usually provided in with different names across callers, are returned with the same names. The standardised variants are returned as `.txt` files. The functions in `call_variants.R` aimed at standardising variants are also the same ones present in the `varikondo`[@Quaglieri_undated-yh] R package available on github. Examples on how to use its functions are provided in the package website https://annaquaglieri16.github.io/varikondo/articles/vignette.html and below.  
+
+The earlier version of the functions returns some duplicated rows compared to using `varikondo` but this won't affect the results of the study as we only looked at unique variants.
+
+The `.txt` files `SRX729580_germline_final.txt` produced for each caller are used for sensitivity analysis and they are processed as discussed in the Methods paper. In the example below we only report one somatic mutations found on KIT. 
+
+```{r example-varikondo-mutect}
+# devtools::install_github("annaquaglieri16/varikondo")
+# detach("package:varikondo")
+library(varikondo)
+utils::packageVersion("varikondo")
+
+library(here)
+
+# Variant file created with ./functions/call_variants.R
+mutect.table <- read.delim(file.path(here(),"data/test-variants/mutect/regions_caller_defaults/annotated_variants/SRX729580_germline_final.txt"),sep = "\t")
+dim(mutect.table)
+
+knitr::kable(mutect.table)
+
+# Read and parse with varikondo
+mutect.varik <- varikondo::parse_vcf_output(file.path(here(),"data/test-variants/mutect/regions_caller_defaults/annotated_variants/SRX729580_germline_annotated.vcf"), caller = "mutect",vep=TRUE)
+dim(mutect.varik)
+
+knitr::kable(mutect.varik)
+
+```
+
+
+
+```{r example-varikondo-varscan}
+# Variant file created with ./functions/call_variants.R
+varscan.table <- read.delim(file.path(here(),"data/test-variants/varscan/regions_caller_defaults/annotated_variants/SRX729580_germline_final.txt"),sep = "\t")
+dim(varscan.table)
+
+knitr::kable(varscan.table)
+
+# Read and parse with varikondo
+varscan.varik <- varikondo::parse_vcf_output(file.path(here(),"data/test-variants/varscan/regions_caller_defaults/annotated_variants/SRX729580_germline_annotated.vcf"), caller = "varscan",vep = TRUE)
+dim(varscan.varik)
+
+knitr::kable(varscan.varik)
+```
+
+
+```{r example-varikondo-vardict}
+# VarDict file created with ./functions/call_variants.R
+vardict.table <- read.delim(file.path(here(),"data/test-variants/vardict/regions_caller_defaults/annotated_variants/SRX729580_germline_final.txt"),sep = "\t")
+
+knitr::kable(vardict.table)
+
+# Read and parse with varikondo
+vardict.varik <- varikondo::parse_vcf_output(file.path(here(),"data/test-variants/vardict/regions_caller_defaults/annotated_variants/SRX729580_germline_annotated.vcf"), caller = "vardict",vep = TRUE)
+dim(vardict.varik)
+
+knitr::kable(vardict.varik)
+```
+
