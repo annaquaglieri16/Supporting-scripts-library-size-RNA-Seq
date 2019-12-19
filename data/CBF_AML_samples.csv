@@ -1,50 +1,50 @@
-title,paired_sample,Status,karyotype
-03H065, ,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-03H083,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-03H095,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-03H109,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-03H112,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-04H030,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-04H061,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-04H091,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-05H042,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-05H090,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-05H099,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-05H113,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-05H118,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-05H136,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-05H184,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-06H020,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-06H035,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-06H115,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-06H151,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-07H099,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-07H137,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-07H144,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-08H034,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-08H042,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-08H072,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-08H081,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-08H099,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-09H016,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-09H040,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-09H066,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-10H008,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-10H030,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-10H119,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-11H022, ,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-11H104,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-11H107, ,Relapse,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-11H179,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-12H042,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-12H044,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-12H045,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-12H098,,Relapse,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-12H165, 13H140,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-12H166,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-12H180,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-12H183,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
-13H066,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-13H120,,Diagnosis,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-13H140, 12H165,Relapse,AML with inv(16)(p13.1q22) or t(16;16)(p13.1;q22); CBFB-MYH11
-13H169,,Diagnosis,AML with t(8;21)(q22;q22); RUNX1-RUNX1T1
+title
+03H065
+03H083
+03H095
+03H109
+03H112
+04H030
+04H061
+04H091
+05H042
+05H090
+05H099
+05H113
+05H118
+05H136
+05H184
+06H020
+06H035
+06H115
+06H151
+07H099
+07H137
+07H144
+08H034
+08H042
+08H072
+08H081
+08H099
+09H016
+09H040
+09H066
+10H008
+10H030
+10H119
+11H022
+11H104
+11H107
+11H179
+12H042
+12H044
+12H045
+12H098
+12H165
+12H166
+12H180
+12H183
+13H066
+13H120
+13H140
+13H169
